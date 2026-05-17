@@ -187,6 +187,7 @@ class TaskExecutor(QThread):
             return True
 
         on_fail = step.get("on_fail", "stop")
+        trigger_delay_ms = step.get("trigger_delay_ms", 250)
         touch_duration_ms = step.get("touch_duration_ms", 50)
         after_delay_ms = step.get("after_delay_ms", 200)
 
@@ -202,8 +203,12 @@ class TaskExecutor(QThread):
         x, y = result["click_point"]
         conf = result.get("confidence", 0)
         self.log_message.emit(
-            f"  ✓ 匹配成功 (置信度{conf:.2f}), 点击({x}, {y}), "
-            f"按住{self._fmt_ms(touch_duration_ms)}")
+            f"  ✓ 匹配成功 (置信度{conf:.2f}), 点击({x}, {y})")
+
+        if trigger_delay_ms > 0:
+            self.log_message.emit(f"  触发延迟 {self._fmt_ms(trigger_delay_ms)}...")
+            self._sleep_ms(trigger_delay_ms)
+
         try:
             self._dm.tap(self._addr, int(x), int(y))
         except Exception as e:
@@ -211,7 +216,7 @@ class TaskExecutor(QThread):
             return on_fail != "stop"
 
         if after_delay_ms > 0:
-            self.log_message.emit(f"  等待 {self._fmt_ms(after_delay_ms)}...")
+            self.log_message.emit(f"  后延 {self._fmt_ms(after_delay_ms)}...")
             self._sleep_ms(after_delay_ms)
         return True
 

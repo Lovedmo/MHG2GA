@@ -495,7 +495,7 @@ class TaskConfigTab(QWidget):
 
     def _on_executor_log(self, msg: str) -> None:
         from src.core.logger import get_logger
-        get_logger("task_executor").info(msg)
+        get_logger("task_executor").info(msg, extra={"device": self._active_device or "系统"})
 
     # ================================================================
     # Page 1 — 步骤编辑器
@@ -750,6 +750,15 @@ class TaskConfigTab(QWidget):
         touch_layout.setSpacing(4)
         touch_layout.setContentsMargins(8, 12, 8, 8)
 
+        touch_layout.addWidget(QLabel("触发延迟"))
+        self._trigger_delay = QSpinBox()
+        self._trigger_delay.setRange(0, 60000)
+        self._trigger_delay.setValue(250)
+        self._trigger_delay.setSingleStep(50)
+        self._trigger_delay.setSuffix(" ms")
+        self._trigger_delay.setToolTip("匹配成功后，等待多久再执行点击")
+        touch_layout.addWidget(self._trigger_delay)
+
         touch_layout.addWidget(QLabel("触摸时长"))
         self._touch_duration = QSpinBox()
         self._touch_duration.setRange(10, 10000)
@@ -761,7 +770,7 @@ class TaskConfigTab(QWidget):
         touch_layout.addWidget(QLabel("触摸后延时"))
         self._after_delay = QSpinBox()
         self._after_delay.setRange(0, 3600000)
-        self._after_delay.setValue(500)
+        self._after_delay.setValue(200)
         self._after_delay.setSingleStep(100)
         self._after_delay.setSuffix(" ms")
         touch_layout.addWidget(self._after_delay)
@@ -873,6 +882,7 @@ class TaskConfigTab(QWidget):
         self._while_max_loops.valueChanged.connect(self._sync_step_tree_item)
         self._max_timeout.valueChanged.connect(self._sync_step_tree_item)
         self._max_retries.valueChanged.connect(self._sync_step_tree_item)
+        self._trigger_delay.valueChanged.connect(self._sync_step_tree_item)
         self._touch_duration.valueChanged.connect(self._sync_step_tree_item)
         self._after_delay.valueChanged.connect(self._sync_step_tree_item)
         self._delay_duration.valueChanged.connect(self._sync_step_tree_item)
@@ -1146,9 +1156,13 @@ class TaskConfigTab(QWidget):
             else:
                 return f"间隔{intv} / 最多{step.get('max_loops', 20)}轮"
         elif stype == "click":
+            trig = step.get("trigger_delay_ms", 250)
             td = step.get("touch_duration_ms", 50)
-            ad = step.get("after_delay_ms", 500)
-            parts = [f"按住{self._fmt_ms(td)}"]
+            ad = step.get("after_delay_ms", 200)
+            parts = []
+            if trig > 0:
+                parts.append(f"延{self._fmt_ms(trig)}")
+            parts.append(f"按住{self._fmt_ms(td)}")
             if ad > 0:
                 parts.append(f"后延{self._fmt_ms(ad)}")
             on_fail = step.get("on_fail", "skip")
@@ -1375,8 +1389,9 @@ class TaskConfigTab(QWidget):
             idx = self._check_on_fail.findData(on_fail)
             self._check_on_fail.setCurrentIndex(idx if idx >= 0 else 0)
         elif stype == "click":
+            self._trigger_delay.setValue(step.get("trigger_delay_ms", 250))
             self._touch_duration.setValue(step.get("touch_duration_ms", 50))
-            self._after_delay.setValue(step.get("after_delay_ms", 500))
+            self._after_delay.setValue(step.get("after_delay_ms", 200))
             on_fail = step.get("on_fail", "skip")
             idx = self._click_on_fail.findData(on_fail)
             self._click_on_fail.setCurrentIndex(idx if idx >= 0 else 0)
@@ -1460,6 +1475,7 @@ class TaskConfigTab(QWidget):
             step["max_timeout_ms"] = self._while_max_timeout.value()
             step["max_loops"] = self._while_max_loops.value()
         elif stype == "click":
+            step["trigger_delay_ms"] = self._trigger_delay.value()
             step["touch_duration_ms"] = self._touch_duration.value()
             step["after_delay_ms"] = self._after_delay.value()
             step["on_fail"] = self._click_on_fail.currentData() or "skip"

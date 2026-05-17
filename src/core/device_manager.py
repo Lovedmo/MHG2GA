@@ -517,7 +517,7 @@ class DeviceManager:
         except Exception:
             return "UNKNOWN"
 
-    def get_orientation(self, address: str) -> int:
+    def get_orientation(self, address: str, silent: bool = False) -> int:
         """获取设备屏幕方向 (0=竖屏, 1=横屏左, 2=倒置, 3=横屏右)。"""
         dev = self._devices.get(address)
         if not dev:
@@ -525,7 +525,8 @@ class DeviceManager:
         try:
             info = dev.display_info
             orientation = info.get("orientation", 0)
-            logger.debug("设备方向: %d", orientation, extra={"device": address})
+            if not silent:
+                logger.debug("设备方向: %d", orientation, extra={"device": address})
             return orientation
         except Exception:
             return 0
@@ -548,7 +549,7 @@ class DeviceManager:
                 logger.warning("截图返回空数据", extra={"device": address})
                 return None, elapsed
 
-            orientation = self.get_orientation(address)
+            orientation = self.get_orientation(address, silent=silent)
             if orientation == 1:
                 screen = cv2.rotate(screen, cv2.ROTATE_90_CLOCKWISE)
 

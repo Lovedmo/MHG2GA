@@ -59,6 +59,7 @@ DEFAULT_STEPS: dict[str, dict] = {
         "type": "click",
         "template": "",
         "description": "",
+        "trigger_delay_ms": 250,
         "touch_duration_ms": 50,
         "after_delay_ms": 200,
         "on_fail": "stop",
