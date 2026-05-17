@@ -22,10 +22,33 @@ MHG2GA 是一款面向崩坏学园2的模拟器全自动化辅助工具。通过
 
 ## 快速开始
 
+### 开发环境运行
+
 ```bash
 pip install -r requirements.txt
 python src/main.py
 ```
+
+### 构建 Release 版本
+
+```bash
+pip install pyinstaller
+python build.py            # 目录模式（推荐）
+python build.py --onefile  # 单文件模式
+python build.py --clean    # 清理构建产物
+```
+
+构建产物位于 `dist/MHG2GA/`，目录结构：
+
+```
+dist/MHG2GA/
+├── MHG2GA.exe       # 主程序
+├── assets/          # 模板资源（可修改）
+├── data/            # 配置与任务（可修改）
+└── _internal/       # 运行时依赖（勿修改）
+```
+
+分发时将 `dist/MHG2GA/` 整个文件夹打包为 zip 即可。
 
 ## 文档
 

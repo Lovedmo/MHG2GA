@@ -15,8 +15,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(ROOT / 'src' / 'gui' / 'resources'), 'src/gui/resources'),
-        (str(ROOT / 'assets'), 'assets'),
-        (str(ROOT / 'data'), 'data'),
+        (str(ROOT / 'src' / 'config' / 'default.yaml'), 'src/config'),
     ],
     hiddenimports=[
         'airtest',

@@ -61,9 +61,23 @@ def build(onefile: bool = False):
         output = DIST_DIR / "MHG2GA.exe"
 
     if output.exists():
+        if not onefile:
+            _copy_runtime_dirs(output)
         print(f"\n[build] 构建成功！输出位置: {output}")
     else:
         print(f"\n[build] 构建可能已完成，请检查 {DIST_DIR}")
+
+
+def _copy_runtime_dirs(dist_app_dir: Path):
+    """将可写的 assets/ 和 data/ 复制到 exe 同级目录。"""
+    for dirname in ("assets", "data"):
+        src = ROOT / dirname
+        dst = dist_app_dir / dirname
+        if src.exists():
+            if dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(src, dst)
+            print(f"  [copy] {dirname}/ → {dst}")
 
 
 def main():
