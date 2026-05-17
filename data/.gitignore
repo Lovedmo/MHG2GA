@@ -1,0 +1,6 @@
+*.db
+*.yaml
+*.log
+logs/
+temp/
+!.gitignore

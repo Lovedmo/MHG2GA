@@ -1,2 +1,36 @@
 # MHG2GA
-MHG2GA（Make Houkai Gakuen 2 Greate Again 工具，支持Mihoyo旗下崩坏学园2游戏在模拟器上的全自动流程）
+
+> **Make Houkai Gakuen 2 Great Again**
+
+MHG2GA 是一款面向崩坏学园2的模拟器全自动化辅助工具。通过 ADB 协议连接 Android 模拟器，利用图像识别技术自动完成游戏中的日常重复操作，并提供 GUI 界面供用户配置和监控。
+
+## 功能
+
+- **设备管理** — 多设备连接、模拟器自动启停、应用锁定与探活保活
+- **模板匹配** — 基于 OpenCV 多模式匹配（标准/蒙版/边缘），截图即用，无需训练
+- **可视化工作流** — 树形步骤编辑器，支持条件(if)、循环(while)、点击、延时，任意深度嵌套
+- **任务自动执行** — 后台引擎按工作流步骤自动截图→识别→操作，多设备并行
+- **模板工作台** — 截取、分类、蒙版编辑、参数调优、实时匹配测试
+- **GUI 界面** — 暗色主题，设备列表+多标签配置，独立日志窗口，系统托盘
+
+## 技术栈
+
+- **Python 3.14** + **Airtest 1.4.3**（自动化框架）
+- **OpenCV**（图像识别与处理）
+- **PyQt6**（GUI 界面）
+- **MuMuManager**（模拟器命令行管理）
+
+## 快速开始
+
+```bash
+pip install -r requirements.txt
+python src/main.py
+```
+
+## 文档
+
+- [技术架构文档](docs/ARCHITECTURE.md) — 完整的系统设计、模块规范和开发指南
+
+## 许可证
+
+[MIT License](LICENSE)

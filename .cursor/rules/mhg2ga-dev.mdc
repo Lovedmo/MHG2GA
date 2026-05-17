@@ -1,0 +1,70 @@
+---
+description: MHG2GA 项目开发规范 — 在开发 MHG2GA 项目代码时必须遵循此规则
+globs: src/**/*.py, tests/**/*.py
+alwaysApply: false
+---
+
+# MHG2GA 开发规范
+
+在进行 MHG2GA 项目开发时，必须先阅读 `docs/ARCHITECTURE.md` 了解当前系统架构和实现状态。
+
+## 架构分层（当前已实现）
+
+```
+GUI 表现层        — PyQt6 主窗口、配置面板、日志控制台
+  └ Workers      — QThread 异步任务线程（连接、截图、触控等）
+    └ 设备连接层  — DeviceManager 封装 Airtest/ADB 所有操作
+配置持久化        — AppConfig (YAML) + Database (SQLite)
+日志系统          — logger.py 三路输出（终端 + 文件 + GUI 回调）
+```
+
+## 核心约束
+
+1. **所有设备交互必须通过 `DeviceManager`**。禁止直接调用 Airtest API 或 adb 命令。
+
+2. **耗时操作必须放到 Worker (QThread)**。禁止在 GUI 线程中执行 ADB 操作。Worker 实例必须保存到 `self._workers` 列表防止 GC 回收。
+
+3. **截图数据通过临时文件传递**。numpy 数组不能跨线程安全传递给 QPixmap，必须 `cv2.imwrite()` 保存后再 `QPixmap(path)` 加载。
+
+4. **配置变更流程**：GUI 控件值变化 → `config_changed` 信号 → `_on_device_config_changed()` → `AppConfig.update_device_field()` → `save()`。加载配置时必须用 `blockSignals(True)` 屏蔽信号。
+
+5. **日志使用规范**：
+   ```python
+   from src.core.logger import get_logger
+   logger = get_logger("模块名")
+   logger.info("消息", extra={"device": "127.0.0.1:16384"})
+   ```
+
+6. **Airtest 兼容性**：
+   - 截图/触控方式不通过 URI 参数指定（会被忽略）
+   - 连接后通过 `set_cap_method()` / `set_touch_method()` 设置
+   - 这两个方法绕过了 Airtest 有 bug 的 property setter，直接操作内部 proxy
+   - MuMu 12 推荐 **JAVACAP + MAXTOUCH**
+
+7. **MuMu 12 多开端口**：`127.0.0.1:16384 + i*32` (i=0..31)
+
+8. **MuMuManager 命令行**：MuMu 12 提供 `MuMuManager.exe` CLI 工具用于批量管理模拟器（创建/删除/启动/关闭/配置/ADB 等）。完整命令参考见 `.cursor/skills/mumu-manager/SKILL.md`，配置项列表见 `settings-reference.md`。
+
+## 目录结构
+
+| 目录 | 用途 |
+|------|------|
+| `src/core/` | 核心业务（DeviceManager、Worker、Logger、Database） |
+| `src/gui/` | 所有 GUI 组件 |
+| `src/gui/widgets/` | 可复用小组件（ImagePreview、StatusIndicator） |
+| `src/config/` | 配置管理（AppConfig、default.yaml） |
+| `data/` | 运行时数据（config.yaml、db、logs、temp） |
+| `tests/connectivity/` | ADB 连接测试脚本 |
+
+## 待开发模块
+
+以下模块尚未实现，开发时参考 `docs/ARCHITECTURE.md` 第 9 节：
+
+- `src/core/game_controller.py` — GameController（图像识别+操控封装）
+- `src/core/scheduler.py` — TaskScheduler（任务调度）
+- `src/tasks/` — 游戏任务模块（BaseTask + 各具体任务）
+- `assets/templates/` — 图像模板目录
+
+## Git 提交
+
+使用 Conventional Commits: `feat/fix/refactor/docs/test/chore(<scope>): <description>`

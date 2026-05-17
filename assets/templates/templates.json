@@ -1,0 +1,475 @@
+{
+  "templates": [
+    {
+      "name": "buchongtili",
+      "category": "mainwindow",
+      "file": "mainwindow/buchongtili.png",
+      "threshold": 0.7,
+      "rgb": true,
+      "roi": [
+        203,
+        63,
+        184,
+        32
+      ],
+      "click_offset": null,
+      "description": "补充体力",
+      "width": 28,
+      "height": 26,
+      "match_mode": "edge"
+    },
+    {
+      "name": "shouye_on",
+      "category": "mainwindow",
+      "file": "mainwindow/shouye_on.png",
+      "threshold": 0.7,
+      "rgb": false,
+      "roi": [
+        0,
+        0,
+        1024,
+        112
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "首页（选中）",
+      "width": 54,
+      "height": 67
+    },
+    {
+      "name": "shouye_off",
+      "category": "mainwindow",
+      "file": "mainwindow/shouye_off.png",
+      "threshold": 0.7,
+      "rgb": false,
+      "roi": [
+        0,
+        0,
+        1024,
+        101
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "首页（未选中）",
+      "width": 56,
+      "height": 69
+    },
+    {
+      "name": "bt_tc",
+      "category": "mainwindow",
+      "file": "mainwindow/bt_tc.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "崩塔第一次进入弹窗",
+      "width": 115,
+      "height": 43
+    },
+    {
+      "name": "zhandou",
+      "category": "mainwindow",
+      "file": "mainwindow/zhandou.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": [
+        0,
+        0,
+        1024,
+        101
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "战斗（未选中）",
+      "width": 56,
+      "height": 60
+    },
+    {
+      "name": "qita",
+      "category": "mainwindow",
+      "file": "mainwindow/qita.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": [
+        0,
+        0,
+        1024,
+        96
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "其他（未选中）",
+      "width": 53,
+      "height": 58
+    },
+    {
+      "name": "shangdian",
+      "category": "mainwindow",
+      "file": "mainwindow/shangdian.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": [
+        0,
+        0,
+        1024,
+        101
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "商店（未选中）",
+      "width": 52,
+      "height": 63
+    },
+    {
+      "name": "shejiao",
+      "category": "mainwindow",
+      "file": "mainwindow/shejiao.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": [
+        0,
+        0,
+        1024,
+        101
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "社交（未选中）",
+      "width": 57,
+      "height": 64
+    },
+    {
+      "name": "zhuangbei",
+      "category": "mainwindow",
+      "file": "mainwindow/zhuangbei.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": [
+        0,
+        0,
+        1024,
+        100
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "装备（未选中）",
+      "width": 57,
+      "height": 68
+    },
+    {
+      "name": "renwu",
+      "category": "mainwindow",
+      "file": "mainwindow/renwu.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": [
+        0,
+        104,
+        94,
+        388
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "任务",
+      "width": 34,
+      "height": 37
+    },
+    {
+      "name": "gonggao",
+      "category": "mainwindow",
+      "file": "mainwindow/gonggao.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": [
+        0,
+        103,
+        93,
+        390
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "公告",
+      "width": 38,
+      "height": 46
+    },
+    {
+      "name": "houmu",
+      "category": "mainwindow",
+      "file": "mainwindow/houmu.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": [
+        1,
+        111,
+        81,
+        380
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "吼姆",
+      "width": 42,
+      "height": 43
+    },
+    {
+      "name": "mrqd",
+      "category": "common",
+      "file": "common/mrqd.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": [
+        161,
+        474,
+        715,
+        67
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "每日签到",
+      "width": 166,
+      "height": 49
+    },
+    {
+      "name": "gg",
+      "category": "common",
+      "file": "common/gg.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "公告",
+      "width": 243,
+      "height": 59
+    },
+    {
+      "name": "xhjc",
+      "category": "game_activities",
+      "file": "game_activities/xhjc.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "星河剧场",
+      "width": 384,
+      "height": 169
+    },
+    {
+      "name": "xhjc_label",
+      "category": "game_activities",
+      "file": "game_activities/xhjc_label.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "星河剧城标签",
+      "width": 209,
+      "height": 65
+    },
+    {
+      "name": "bonus",
+      "category": "game_activities",
+      "file": "game_activities/bonus.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": null,
+      "click_offset": [
+        53,
+        87
+      ],
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "bonus关",
+      "width": 105,
+      "height": 28
+    },
+    {
+      "name": "doubleticket",
+      "category": "game_activities",
+      "file": "game_activities/doubleticket.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": null,
+      "click_offset": [
+        237,
+        16
+      ],
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "双倍券",
+      "width": 107,
+      "height": 31
+    },
+    {
+      "name": "zhuzhan",
+      "category": "game_activities",
+      "file": "game_activities/zhuzhan.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "选择助战好友（按钮）",
+      "width": 156,
+      "height": 32
+    },
+    {
+      "name": "zhuzhan_haoyou_select",
+      "category": "game_activities",
+      "file": "game_activities/zhuzhan_haoyou_select.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "选择助战好友（实际选择）",
+      "width": 43,
+      "height": 30
+    },
+    {
+      "name": "fight",
+      "category": "game_activities",
+      "file": "game_activities/fight.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "开战",
+      "width": 74,
+      "height": 33
+    },
+    {
+      "name": "ywb",
+      "category": "battle",
+      "file": "battle/ywb.png",
+      "threshold": 0.99,
+      "rgb": false,
+      "roi": [
+        640,
+        502,
+        384,
+        266
+      ],
+      "click_offset": null,
+      "mask_file": "battle/ywb_mask.png",
+      "match_mode": "mask",
+      "description": "愿望杯",
+      "width": 104,
+      "height": 100
+    },
+    {
+      "name": "confirm",
+      "category": "common",
+      "file": "battle/confirm.png",
+      "threshold": 0.9,
+      "rgb": false,
+      "roi": [
+        615,
+        582,
+        188,
+        100
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "通关后确定",
+      "width": 61,
+      "height": 28
+    },
+    {
+      "name": "doubleticket_icon",
+      "category": "common",
+      "file": "common/doubleticket_icon.png",
+      "threshold": 0.9,
+      "rgb": false,
+      "roi": null,
+      "click_offset": [
+        138,
+        29
+      ],
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "通关后双倍券",
+      "width": 49,
+      "height": 55
+    },
+    {
+      "name": "fight_again",
+      "category": "common",
+      "file": "common/fight_again.png",
+      "threshold": 0.9,
+      "rgb": false,
+      "roi": [
+        423,
+        588,
+        358,
+        82
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "通关后再次挑战",
+      "width": 150,
+      "height": 53
+    },
+    {
+      "name": "fill_tl",
+      "category": "common",
+      "file": "common/fill_tl.png",
+      "threshold": 0.9,
+      "rgb": true,
+      "roi": [
+        461,
+        608,
+        296,
+        112
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "补充体力",
+      "width": 105,
+      "height": 30
+    },
+    {
+      "name": "filltl_gm",
+      "category": "common",
+      "file": "common/filltl_gm.png",
+      "threshold": 0.9,
+      "rgb": true,
+      "roi": [
+        306,
+        271,
+        404,
+        226
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "买体力",
+      "width": 82,
+      "height": 36
+    }
+  ]
+}

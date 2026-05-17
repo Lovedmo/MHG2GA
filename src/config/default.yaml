@@ -1,0 +1,16 @@
+global:
+  adb_path: ""
+  mumu_manager_path: ""
+  default_cap_method: "ADBCAP"
+  default_touch_method: "ADBTOUCH"
+  theme: "暗色"
+  log_level: "INFO"
+  log_path: "logs/mhg2ga.log"
+  minimize_to_tray: true
+  auto_connect: true
+
+recognition:
+  default_threshold: 0.80
+  screenshot_interval: 0.5
+
+devices: []
