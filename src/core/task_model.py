@@ -23,19 +23,22 @@ logger = get_logger("task_model")
 from src.core.path_helper import get_data_path
 _DATA_DIR = get_data_path("data")
 
-STEP_TYPES = ["check", "whileif", "click", "delay"]
+STEP_TYPES = ["check", "whileif", "click", "delay", "ref"]
 
 STEP_TYPE_LABELS = {
     "check": "条件",
     "whileif": "循环",
     "click": "点击",
     "delay": "延时",
+    "ref": "引用",
 }
 
 DEFAULT_STEPS: dict[str, dict] = {
     "check": {
         "type": "check",
         "template": "",
+        "templates": [],
+        "match_logic": "or",
         "description": "",
         "retry_enabled": False,
         "retry_interval_ms": 1000,
@@ -48,6 +51,8 @@ DEFAULT_STEPS: dict[str, dict] = {
     "whileif": {
         "type": "whileif",
         "template": "",
+        "templates": [],
+        "match_logic": "or",
         "description": "",
         "check_interval_ms": 1000,
         "timeout_mode": "time",
@@ -67,6 +72,11 @@ DEFAULT_STEPS: dict[str, dict] = {
     "delay": {
         "type": "delay",
         "duration_ms": 1000,
+        "description": "",
+    },
+    "ref": {
+        "type": "ref",
+        "ref_task": "",
         "description": "",
     },
 }
@@ -118,7 +128,6 @@ class TaskManager:
                     self._index.append({
                         "name": t["name"],
                         "description": t.get("description", ""),
-                        "enabled": t.get("enabled", False),
                     })
                     if "steps" in t and t["steps"]:
                         task_file = self._task_file(t["name"])
@@ -197,7 +206,6 @@ class TaskManager:
         self._index.append({
             "name": name,
             "description": task.get("description", ""),
-            "enabled": task.get("enabled", False),
         })
         self._save_index()
         self._save_steps(name, task.get("steps", []))
@@ -241,4 +249,4 @@ class TaskManager:
 
     @staticmethod
     def new_task(name: str, description: str = "") -> dict:
-        return {"name": name, "description": description, "enabled": False, "steps": []}
+        return {"name": name, "description": description, "steps": []}

@@ -74,7 +74,7 @@
       "name": "zhandou",
       "category": "mainwindow",
       "file": "mainwindow/zhandou.png",
-      "threshold": 0.8,
+      "threshold": 0.7,
       "rgb": false,
       "roi": [
         0,
@@ -248,7 +248,10 @@
       "threshold": 0.8,
       "rgb": true,
       "roi": null,
-      "click_offset": null,
+      "click_offset": [
+        206,
+        26
+      ],
       "mask_file": null,
       "match_mode": "normal",
       "description": "公告",
@@ -282,23 +285,6 @@
       "description": "星河剧城标签",
       "width": 209,
       "height": 65
-    },
-    {
-      "name": "bonus",
-      "category": "game_activities",
-      "file": "game_activities/bonus.png",
-      "threshold": 0.8,
-      "rgb": true,
-      "roi": null,
-      "click_offset": [
-        53,
-        87
-      ],
-      "mask_file": null,
-      "match_mode": "normal",
-      "description": "bonus关",
-      "width": 105,
-      "height": 28
     },
     {
       "name": "doubleticket",
@@ -363,7 +349,7 @@
       "name": "ywb",
       "category": "battle",
       "file": "battle/ywb.png",
-      "threshold": 0.99,
+      "threshold": 0.98,
       "rgb": false,
       "roi": [
         640,
@@ -401,7 +387,7 @@
       "name": "doubleticket_icon",
       "category": "common",
       "file": "common/doubleticket_icon.png",
-      "threshold": 0.9,
+      "threshold": 0.8,
       "rgb": false,
       "roi": null,
       "click_offset": [
@@ -409,29 +395,10 @@
         29
       ],
       "mask_file": null,
-      "match_mode": "edge",
+      "match_mode": "normal",
       "description": "通关后双倍券",
       "width": 49,
       "height": 55
-    },
-    {
-      "name": "fight_again",
-      "category": "common",
-      "file": "common/fight_again.png",
-      "threshold": 0.9,
-      "rgb": false,
-      "roi": [
-        423,
-        588,
-        358,
-        82
-      ],
-      "click_offset": null,
-      "mask_file": null,
-      "match_mode": "edge",
-      "description": "通关后再次挑战",
-      "width": 150,
-      "height": 53
     },
     {
       "name": "fill_tl",
@@ -470,6 +437,102 @@
       "description": "买体力",
       "width": 82,
       "height": 36
+    },
+    {
+      "name": "login",
+      "category": "common",
+      "file": "common/login.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": null,
+      "click_offset": [
+        664,
+        71
+      ],
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "登录",
+      "width": 753,
+      "height": 100
+    },
+    {
+      "name": "login_continue",
+      "category": "common",
+      "file": "common/login_continue.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": [
+        316,
+        654,
+        381,
+        114
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "登录继续",
+      "width": 276,
+      "height": 44
+    },
+    {
+      "name": "bonus",
+      "category": "game_activities",
+      "file": "game_activities/bonus.png",
+      "threshold": 0.7,
+      "rgb": true,
+      "roi": [
+        1,
+        269,
+        197,
+        219
+      ],
+      "click_offset": [
+        53,
+        87
+      ],
+      "mask_file": null,
+      "match_mode": "edge",
+      "description": "bonus关",
+      "width": 107,
+      "height": 38
+    },
+    {
+      "name": "fight_again",
+      "category": "common",
+      "file": "common/fight_again.png",
+      "threshold": 0.7,
+      "rgb": false,
+      "roi": [
+        407,
+        590,
+        199,
+        85
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "通关后再次挑战",
+      "width": 95,
+      "height": 29
+    },
+    {
+      "name": "fight_again_1_2",
+      "category": "common",
+      "file": "common/fight_again_1_2.png",
+      "threshold": 0.7,
+      "rgb": false,
+      "roi": [
+        412,
+        583,
+        202,
+        101
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "通关后再次挑战12用",
+      "width": 92,
+      "height": 25
     }
   ]
 }

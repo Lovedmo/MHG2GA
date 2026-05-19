@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
     QStackedWidget, QInputDialog, QMenu,
 )
 
+from src.core.template_matching import build_template_match_args
 from src.core.template_manager import TemplateManager, CATEGORIES
 from src.gui.widgets.selectable_image_view import SelectableImageView
 from src.gui.widgets.mask_editor import MaskEditor
@@ -996,12 +997,10 @@ class TemplateWorkspace(QWidget):
             self._status_label.setText(f"模板图片加载失败: {name}")
             return
 
-        threshold = data.get("threshold", 0.80)
-        rgb = data.get("rgb", True)
-        roi = data.get("roi")
-        click_offset = data.get("click_offset")
         match_mode = data.get("match_mode", "normal")
         mask = self._tm.load_mask(name) if match_mode == "mask" else None
+        match_args = build_template_match_args(data, mask=mask)
+        threshold = match_args["threshold"]
 
         rounds = 5
         elapsed_list: list[float] = []
@@ -1012,16 +1011,12 @@ class TemplateWorkspace(QWidget):
             if find_all:
                 r = DeviceManager.match_template_all(
                     self._screenshot, tpl_img,
-                    threshold=threshold, rgb=rgb,
-                    roi=roi, click_offset=click_offset,
-                    mask=mask, match_mode=match_mode,
+                    **match_args,
                 )
             else:
                 single = DeviceManager.match_template(
                     self._screenshot, tpl_img,
-                    threshold=threshold, rgb=rgb,
-                    roi=roi, click_offset=click_offset,
-                    mask=mask, match_mode=match_mode,
+                    **match_args,
                 )
                 r = [single] if single else []
             elapsed_list.append((time.perf_counter() - t0) * 1000)

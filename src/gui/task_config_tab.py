@@ -32,11 +32,12 @@ from PyQt6.QtGui import QColor, QPainter, QPixmap, QIcon
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QGroupBox, QLabel, QPushButton, QComboBox, QFrame,
-    QLineEdit, QSpinBox, QCompleter,
+    QLineEdit, QSpinBox, QCompleter, QCheckBox,
     QTreeWidget, QTreeWidgetItem, QHeaderView,
     QAbstractItemView, QMessageBox, QInputDialog, QDialog,
     QRadioButton, QButtonGroup, QStackedWidget, QSplitter,
     QScrollArea, QDialogButtonBox, QSizePolicy,
+    QListWidget, QListWidgetItem,
 )
 
 from src.core.task_model import TaskManager, STEP_TYPE_LABELS, CONTAINER_TYPES, count_steps_recursive
@@ -141,6 +142,8 @@ class _TaskCardWidget(QFrame):
     card_clicked = pyqtSignal(str)
     edit_info = pyqtSignal(str)
     toggle_enabled = pyqtSignal(str, bool)
+    auto_start_changed = pyqtSignal(str, bool)
+    fail_restart_changed = pyqtSignal(str, bool)
 
     def __init__(self, task: dict, parent=None):
         super().__init__(parent)
@@ -148,7 +151,7 @@ class _TaskCardWidget(QFrame):
         self._enabled = task.get("enabled", False)
         self.setObjectName("taskCard")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumSize(200, 120)
+        self.setMinimumSize(200, 130)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._build(task)
         self._apply_style()
@@ -175,6 +178,22 @@ class _TaskCardWidget(QFrame):
         layout.addWidget(info)
 
         layout.addStretch()
+
+        self._auto_start_cb = QCheckBox("拉起后执行")
+        self._auto_start_cb.setChecked(task.get("auto_start", False))
+        self._auto_start_cb.setStyleSheet("color: #a6adc8; font-size: 11px;")
+        self._auto_start_cb.setToolTip("锁定应用被拉起后自动执行此任务")
+        self._auto_start_cb.toggled.connect(
+            lambda checked: self.auto_start_changed.emit(self._name, checked))
+        layout.addWidget(self._auto_start_cb)
+
+        self._fail_restart_cb = QCheckBox("失败重启应用")
+        self._fail_restart_cb.setChecked(task.get("fail_restart", False))
+        self._fail_restart_cb.setStyleSheet("color: #a6adc8; font-size: 11px;")
+        self._fail_restart_cb.setToolTip("任务失败时关闭锁定应用，由探活机制自动重启")
+        self._fail_restart_cb.toggled.connect(
+            lambda checked: self.fail_restart_changed.emit(self._name, checked))
+        layout.addWidget(self._fail_restart_cb)
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(6)
@@ -268,14 +287,17 @@ class TaskConfigTab(QWidget):
         "whileif": QColor("#cba6f7"),
         "click": QColor("#a6e3a1"),
         "delay": QColor("#f9e2af"),
+        "ref": QColor("#94e2d5"),
     }
 
     def __init__(self, task_manager: TaskManager | None = None,
-                 template_manager=None, device_manager=None, parent=None):
+                 template_manager=None, device_manager=None,
+                 app_config=None, parent=None):
         super().__init__(parent)
         self._task_mgr = task_manager
         self._tm = template_manager
         self._device_mgr = device_manager
+        self._app_config = app_config
         self._active_device: str | None = None
         self._executors: dict[str, "TaskExecutor"] = {}
         self._current_task: dict | None = None
@@ -345,10 +367,14 @@ class TaskConfigTab(QWidget):
 
         tasks = self._task_mgr.tasks
         for i, task in enumerate(tasks):
-            card = _TaskCardWidget(task)
+            ts = self._get_device_task_settings(task["name"])
+            card_data = dict(task, **ts)
+            card = _TaskCardWidget(card_data)
             card.card_clicked.connect(self._on_card_clicked)
             card.edit_info.connect(self._on_edit_task_info)
             card.toggle_enabled.connect(self._on_toggle_task)
+            card.auto_start_changed.connect(self._on_auto_start_changed)
+            card.fail_restart_changed.connect(self._on_fail_restart_changed)
             self._card_grid.addWidget(card, i // COLS_PER_ROW, i % COLS_PER_ROW)
 
         for col in range(COLS_PER_ROW):
@@ -428,6 +454,7 @@ class TaskConfigTab(QWidget):
 
     def set_active_device(self, address: str | None) -> None:
         self._active_device = address
+        self._refresh_overview()
 
     def stop_all_tasks(self) -> None:
         for name, executor in list(self._executors.items()):
@@ -435,17 +462,44 @@ class TaskConfigTab(QWidget):
             executor.wait(3000)
         self._executors.clear()
 
-    def _on_toggle_task(self, task_name: str, enabled: bool) -> None:
-        task = self._task_mgr.get_task(task_name)
-        if not task:
-            return
-        task["enabled"] = enabled
-        self._task_mgr.add_task(task)
+    def _get_device_task_settings(self, task_name: str) -> dict:
+        """获取当前设备上某任务的设备级配置。"""
+        if not self._app_config or not self._active_device:
+            return {}
+        return self._app_config.get_task_settings(self._active_device, task_name)
 
+    def _set_device_task_setting(self, task_name: str, **kwargs) -> None:
+        """更新当前设备上某任务的设备级配置并保存。"""
+        if not self._app_config or not self._active_device:
+            return
+        self._app_config.set_task_settings(self._active_device, task_name, **kwargs)
+        self._app_config.save()
+
+    def _on_toggle_task(self, task_name: str, enabled: bool) -> None:
+        self._set_device_task_setting(task_name, enabled=enabled)
         if enabled:
             self._start_task(task_name)
         else:
             self._stop_task(task_name)
+
+    def _on_auto_start_changed(self, task_name: str, auto_start: bool) -> None:
+        self._set_device_task_setting(task_name, auto_start=auto_start)
+
+    def _on_fail_restart_changed(self, task_name: str, fail_restart: bool) -> None:
+        self._set_device_task_setting(task_name, fail_restart=fail_restart)
+
+    def start_auto_start_tasks(self) -> None:
+        """启动所有标记了 auto_start 的任务。"""
+        for task in self._task_mgr.tasks:
+            ts = self._get_device_task_settings(task["name"])
+            if ts.get("auto_start", False) and task["name"] not in self._executors:
+                from src.core.logger import get_logger
+                get_logger("task_executor").info(
+                    "自动启动任务: %s", task["name"],
+                    extra={"device": self._active_device or "系统"})
+                self._set_device_task_setting(task["name"], enabled=True)
+                self._start_task(task["name"])
+                self._update_card_switch(task["name"], True)
 
     def _start_task(self, task_name: str) -> None:
         if task_name in self._executors:
@@ -459,10 +513,15 @@ class TaskConfigTab(QWidget):
         task = self._task_mgr.get_task(task_name)
         if not task:
             return
-        executor = TaskExecutor(task, self._active_device,
-                                self._device_mgr, self._tm, parent=self)
+        ts = self._get_device_task_settings(task_name)
+        task_with_settings = dict(task, **ts)
+        executor = TaskExecutor(task_with_settings, self._active_device,
+                                self._device_mgr, self._tm,
+                                task_mgr=self._task_mgr, parent=self)
         executor.task_finished.connect(lambda name, ok: self._on_task_finished(name, ok))
         executor.log_message.connect(self._on_executor_log)
+        executor.log_debug.connect(self._on_executor_debug)
+        executor.request_restart.connect(self._on_executor_restart)
         self._executors[task_name] = executor
         executor.start()
 
@@ -474,10 +533,7 @@ class TaskConfigTab(QWidget):
 
     def _on_task_finished(self, task_name: str, success: bool) -> None:
         self._executors.pop(task_name, None)
-        task = self._task_mgr.get_task(task_name)
-        if task:
-            task["enabled"] = False
-            self._task_mgr.add_task(task)
+        self._set_device_task_setting(task_name, enabled=False)
         self._update_card_switch(task_name, False)
 
     def _update_card_switch(self, task_name: str, enabled: bool) -> None:
@@ -493,9 +549,34 @@ class TaskConfigTab(QWidget):
                 widget._switch.blockSignals(False)
                 break
 
+    def _on_executor_restart(self, task_name: str) -> None:
+        """任务失败后重启锁定应用，由探活机制自动拉起。"""
+        addr = self._active_device
+        if not addr or not self._device_mgr or not self._app_config:
+            return
+        dev_cfg = self._app_config.get_device_config(addr)
+        locked_app = dev_cfg.get("locked_app", "")
+        if not locked_app:
+            from src.core.logger import get_logger
+            get_logger("task_executor").warning(
+                "重启应用失败: 未设置锁定应用", extra={"device": addr})
+            return
+        from src.core.logger import get_logger
+        log = get_logger("task_executor")
+        try:
+            self._device_mgr.stop_app(addr, locked_app)
+            log.info("任务 [%s] 失败 → 已关闭应用 %s，等待探活重启",
+                     task_name, locked_app, extra={"device": addr})
+        except Exception as e:
+            log.error("关闭应用失败: %s", e, extra={"device": addr})
+
     def _on_executor_log(self, msg: str) -> None:
         from src.core.logger import get_logger
         get_logger("task_executor").info(msg, extra={"device": self._active_device or "系统"})
+
+    def _on_executor_debug(self, msg: str) -> None:
+        from src.core.logger import get_logger
+        get_logger("task_executor").debug(msg, extra={"device": self._active_device or "系统"})
 
     # ================================================================
     # Page 1 — 步骤编辑器
@@ -580,6 +661,11 @@ class TaskConfigTab(QWidget):
             btn.setToolTip(tip)
             btn.clicked.connect(lambda _, t=stype: self._on_add_step(t))
             toolbar.addWidget(btn)
+        import_btn = QPushButton("导入")
+        import_btn.setToolTip("从其他任务导入步骤")
+        import_btn.clicked.connect(self._on_import_steps)
+        toolbar.addWidget(import_btn)
+
         toolbar.addStretch()
 
         for text, tip, slot in [
@@ -639,6 +725,8 @@ class TaskConfigTab(QWidget):
 
         self._tpl_label = QLabel("目标模板")
         basic_layout.addWidget(self._tpl_label)
+
+        tpl_select_row = QHBoxLayout()
         self._template_combo = QComboBox()
         self._template_combo.setEditable(True)
         self._template_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
@@ -646,13 +734,43 @@ class TaskConfigTab(QWidget):
             QCompleter.CompletionMode.PopupCompletion)
         self._template_combo.completer().setFilterMode(
             Qt.MatchFlag.MatchContains)
-        basic_layout.addWidget(self._template_combo)
+        tpl_select_row.addWidget(self._template_combo, 1)
+
+        self._tpl_add_btn = QPushButton("+")
+        self._tpl_add_btn.setFixedSize(28, 28)
+        self._tpl_add_btn.setToolTip("添加到模板列表")
+        self._tpl_add_btn.clicked.connect(self._on_add_template_to_list)
+        tpl_select_row.addWidget(self._tpl_add_btn)
+        basic_layout.addLayout(tpl_select_row)
 
         self._tpl_preview = QLabel()
         self._tpl_preview.setFixedHeight(64)
         self._tpl_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._tpl_preview.setStyleSheet("background: #1e1e2e; border-radius: 4px;")
         basic_layout.addWidget(self._tpl_preview)
+
+        logic_row = QHBoxLayout()
+        logic_row.addWidget(QLabel("匹配逻辑"))
+        logic_row.addStretch()
+        self._match_logic_combo = QComboBox()
+        self._match_logic_combo.addItem("任一匹配 (OR)", "or")
+        self._match_logic_combo.addItem("全部匹配 (AND)", "and")
+        self._match_logic_combo.setFixedWidth(130)
+        logic_row.addWidget(self._match_logic_combo)
+        self._logic_row_widget = QWidget()
+        self._logic_row_widget.setLayout(logic_row)
+        basic_layout.addWidget(self._logic_row_widget)
+
+        self._tpl_list = QListWidget()
+        self._tpl_list.setMaximumHeight(100)
+        self._tpl_list.setStyleSheet("QListWidget { background: #1e1e2e; border-radius: 4px; }")
+        self._tpl_list.currentRowChanged.connect(self._on_tpl_list_selection_changed)
+        basic_layout.addWidget(self._tpl_list)
+
+        self._tpl_remove_btn = QPushButton("移除选中")
+        self._tpl_remove_btn.setFixedHeight(24)
+        self._tpl_remove_btn.clicked.connect(self._on_remove_template_from_list)
+        basic_layout.addWidget(self._tpl_remove_btn)
 
         basic_layout.addWidget(QLabel("步骤描述"))
         self._step_desc = QLineEdit()
@@ -869,11 +987,38 @@ class TaskConfigTab(QWidget):
         while_layout.addStretch()
         self._prop_stack.addWidget(while_page)
 
+        # ═══ Page 4: ref（引用）— 只读 ═══
+        ref_page = QWidget()
+        ref_layout = QVBoxLayout(ref_page)
+        ref_layout.setContentsMargins(0, 0, 0, 0)
+        ref_layout.setSpacing(6)
+
+        ref_box = QGroupBox("引用信息")
+        rbl = QVBoxLayout(ref_box)
+        rbl.setSpacing(4)
+        rbl.setContentsMargins(8, 12, 8, 8)
+        rbl.addWidget(QLabel("引用任务"))
+        self._ref_task_label = QLabel("--")
+        self._ref_task_label.setStyleSheet(
+            "font-size: 13px; font-weight: bold; color: #94e2d5; padding: 4px;")
+        rbl.addWidget(self._ref_task_label)
+        self._ref_steps_label = QLabel("")
+        self._ref_steps_label.setStyleSheet("color: #a6adc8; font-size: 11px;")
+        rbl.addWidget(self._ref_steps_label)
+        ref_hint = QLabel("引用步骤不可编辑，执行时自动加载源任务的最新步骤")
+        ref_hint.setWordWrap(True)
+        ref_hint.setStyleSheet("color: #6c7086; font-size: 11px;")
+        rbl.addWidget(ref_hint)
+        ref_layout.addWidget(ref_box)
+        ref_layout.addStretch()
+        self._prop_stack.addWidget(ref_page)
+
         outer.addWidget(self._prop_stack)
 
         # 属性变更时同步步骤树显示
         self._template_combo.currentIndexChanged.connect(self._sync_step_tree_item)
         self._template_combo.currentIndexChanged.connect(self._update_tpl_preview)
+        self._match_logic_combo.currentIndexChanged.connect(self._sync_step_tree_item)
         self._check_on_fail.currentIndexChanged.connect(self._sync_step_tree_item)
         self._click_on_fail.currentIndexChanged.connect(self._sync_step_tree_item)
         self._retry_interval.valueChanged.connect(self._sync_step_tree_item)
@@ -936,10 +1081,14 @@ class TaskConfigTab(QWidget):
                                Qt.TransformationMode.SmoothTransformation))
 
     def _select_template_in_combo(self, template_name: str) -> None:
+        if not template_name:
+            self._template_combo.setCurrentIndex(-1)
+            self._template_combo.lineEdit().clear()
+            return
         idx = self._template_combo.findData(template_name)
         if idx >= 0:
             self._template_combo.setCurrentIndex(idx)
-        elif template_name:
+        else:
             self._template_combo.addItem(template_name, template_name)
             self._template_combo.setCurrentIndex(self._template_combo.count() - 1)
 
@@ -958,6 +1107,73 @@ class TaskConfigTab(QWidget):
             self._tpl_preview.setPixmap(pm)
         else:
             self._tpl_preview.setText("(无预览)")
+
+    # ─── 多模板列表操作 ───
+
+    def _on_add_template_to_list(self) -> None:
+        """将下拉框当前选中模板添加到多模板列表。"""
+        tpl_name = self._template_combo.currentData()
+        if not tpl_name:
+            return
+        for i in range(self._tpl_list.count()):
+            if self._tpl_list.item(i).data(Qt.ItemDataRole.UserRole) == tpl_name:
+                return
+        tpl_meta = self._tm.get_template(tpl_name) if self._tm else None
+        label = tpl_meta.get("description", tpl_name) if tpl_meta else tpl_name
+        item = QListWidgetItem(label)
+        item.setData(Qt.ItemDataRole.UserRole, tpl_name)
+        self._tpl_list.addItem(item)
+        self._sync_step_tree_item()
+
+    def _on_remove_template_from_list(self) -> None:
+        """移除多模板列表中当前选中项。"""
+        row = self._tpl_list.currentRow()
+        if row >= 0:
+            self._tpl_list.takeItem(row)
+            self._sync_step_tree_item()
+
+    def _on_tpl_list_selection_changed(self, row: int) -> None:
+        """多模板列表选中项变化时更新预览。"""
+        if row < 0:
+            return
+        item = self._tpl_list.item(row)
+        if not item:
+            return
+        tpl_name = item.data(Qt.ItemDataRole.UserRole)
+        if tpl_name and self._tm:
+            tpl = self._tm.get_template(tpl_name)
+            if tpl:
+                icon = self._get_template_icon(tpl)
+                if icon:
+                    self._tpl_preview.setPixmap(icon.pixmap(QSize(120, 60)))
+                    return
+        self._tpl_preview.clear()
+
+    def _load_template_list(self, templates: list[str]) -> None:
+        """从数据加载多模板列表到 UI。"""
+        self._tpl_list.clear()
+        for tpl_name in templates:
+            tpl_meta = self._tm.get_template(tpl_name) if self._tm else None
+            label = tpl_meta.get("description", tpl_name) if tpl_meta else tpl_name
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, tpl_name)
+            self._tpl_list.addItem(item)
+
+    def _collect_template_list(self) -> list[str]:
+        """从 UI 收集多模板列表。"""
+        result = []
+        for i in range(self._tpl_list.count()):
+            tpl_name = self._tpl_list.item(i).data(Qt.ItemDataRole.UserRole)
+            if tpl_name:
+                result.append(tpl_name)
+        return result
+
+    def _set_multi_tpl_visible(self, visible: bool) -> None:
+        """控制多模板相关控件的可见性。"""
+        self._tpl_add_btn.setVisible(visible)
+        self._logic_row_widget.setVisible(visible)
+        self._tpl_list.setVisible(visible)
+        self._tpl_remove_btn.setVisible(visible)
 
     # ================================================================
     # 步骤操作
@@ -1114,6 +1330,10 @@ class TaskConfigTab(QWidget):
 
         if stype == "delay":
             target = self._fmt_ms(step.get("duration_ms", 1000))
+        elif stype == "ref":
+            target = step.get("ref_task", "")
+        elif stype in ("check", "whileif"):
+            target = self._format_templates_label(step)
         else:
             tpl_name = step.get("template", "")
             tpl_meta = self._tm.get_template(tpl_name) if self._tm and tpl_name else None
@@ -1123,6 +1343,8 @@ class TaskConfigTab(QWidget):
             label_text = f"if ({target})"
         elif stype == "whileif":
             label_text = f"while ({target})"
+        elif stype == "ref":
+            label_text = f"→ {target}" if target else "→ (未设置)"
         else:
             label_text = label
 
@@ -1131,30 +1353,57 @@ class TaskConfigTab(QWidget):
         item.setForeground(0, color)
         return item
 
+    def _format_templates_label(self, step: dict) -> str:
+        """格式化 check/whileif 步骤的模板列表为显示文本。"""
+        templates = step.get("templates", [])
+        if not templates:
+            tpl = step.get("template", "")
+            templates = [tpl] if tpl else []
+        if not templates:
+            return ""
+        logic = step.get("match_logic", "or")
+        sep = " | " if logic == "or" else " & "
+        names = []
+        for t in templates:
+            meta = self._tm.get_template(t) if self._tm else None
+            names.append(meta.get("description", t) if meta else t)
+        return sep.join(names)
+
     def _build_params_text(self, step: dict, stype: str) -> str:
         if stype == "check":
+            parts = []
+            tpl_count = len(step.get("templates", []))
+            if tpl_count > 1:
+                logic = step.get("match_logic", "or")
+                parts.append("OR" if logic == "or" else "AND")
             retry = step.get("retry_enabled", False)
             if retry:
                 intv = self._fmt_ms(step.get("retry_interval_ms", 1000))
                 mode = step.get("timeout_mode", "time")
                 if mode == "time":
                     timeout = self._fmt_ms(step.get("max_timeout_ms", 30000))
-                    params = f"轮询{intv} / 超时{timeout}"
+                    parts.append(f"轮询{intv} / 超时{timeout}")
                 else:
-                    params = f"轮询{intv} / 最多{step.get('max_retries', 10)}次"
+                    parts.append(f"轮询{intv} / 最多{step.get('max_retries', 10)}次")
             else:
-                params = "单次检测"
+                parts.append("单次检测")
             on_fail = step.get("on_fail", "skip")
-            params += f" | 失败{'跳过' if on_fail == 'skip' else '停止'}"
-            return params
+            parts.append(f"失败{'跳过' if on_fail == 'skip' else '停止'}")
+            return " | ".join(parts)
         elif stype == "whileif":
+            parts = []
+            tpl_count = len(step.get("templates", []))
+            if tpl_count > 1:
+                logic = step.get("match_logic", "or")
+                parts.append("OR" if logic == "or" else "AND")
             intv = self._fmt_ms(step.get("check_interval_ms", 1000))
             mode = step.get("timeout_mode", "time")
             if mode == "time":
                 limit = self._fmt_ms(step.get("max_timeout_ms", 60000))
-                return f"间隔{intv} / 超时{limit}"
+                parts.append(f"间隔{intv} / 超时{limit}")
             else:
-                return f"间隔{intv} / 最多{step.get('max_loops', 20)}轮"
+                parts.append(f"间隔{intv} / 最多{step.get('max_loops', 20)}轮")
+            return " | ".join(parts)
         elif stype == "click":
             trig = step.get("trigger_delay_ms", 250)
             td = step.get("touch_duration_ms", 50)
@@ -1168,6 +1417,8 @@ class TaskConfigTab(QWidget):
             on_fail = step.get("on_fail", "skip")
             parts.append(f"失败{'跳过' if on_fail == 'skip' else '停止'}")
             return " | ".join(parts)
+        elif stype == "ref":
+            return f"引用: {step.get('ref_task', '')}"
         return ""
 
     def _select_path(self, path: tuple) -> None:
@@ -1218,6 +1469,50 @@ class TaskConfigTab(QWidget):
                     idx = path[-1] + 1
                     sibling_list.insert(idx, step)
                     new_path = path[:-1] + (idx,)
+
+        self._refresh_step_tree(preserve_state=True)
+        self._select_path(new_path)
+
+    def _on_import_steps(self) -> None:
+        """创建一个引用步骤，指向另一个任务。"""
+        if not self._current_task:
+            return
+        self._commit_current_step()
+        current_name = self._current_task.get("name", "")
+        all_tasks = self._task_mgr.tasks
+        other_tasks = [t for t in all_tasks if t.get("name") != current_name]
+        if not other_tasks:
+            QMessageBox.information(self, "导入", "没有其他可导入的任务")
+            return
+
+        names = [t["name"] for t in other_tasks]
+        name, ok = QInputDialog.getItem(
+            self, "导入引用", "选择要引用的任务：", names, 0, False)
+        if not ok or not name:
+            return
+
+        ref_step = {"type": "ref", "ref_task": name, "description": f"引用: {name}"}
+        steps = self._current_task.setdefault("steps", [])
+        path = self._current_step_path
+
+        if not path:
+            steps.append(ref_step)
+            new_path = (len(steps) - 1,)
+        else:
+            selected = self._get_step_at(path)
+            if selected and selected.get("type") in CONTAINER_TYPES:
+                children = selected.setdefault("children", [])
+                children.append(ref_step)
+                new_path = path + (len(children) - 1,)
+            else:
+                sibling_list = self._get_sibling_list(path)
+                if sibling_list is not None:
+                    idx = path[-1] + 1
+                    sibling_list.insert(idx, ref_step)
+                    new_path = path[:-1] + (idx,)
+                else:
+                    steps.append(ref_step)
+                    new_path = (len(steps) - 1,)
 
         self._refresh_step_tree(preserve_state=True)
         self._select_path(new_path)
@@ -1365,14 +1660,29 @@ class TaskConfigTab(QWidget):
         self._prop_group.setTitle(f"步骤属性{path_desc} — {STEP_TYPE_LABELS.get(stype, stype)}")
 
         show_tpl = stype in ("check", "click", "whileif")
+        is_container = stype in ("check", "whileif")
         self._tpl_label.setVisible(show_tpl)
         self._template_combo.setVisible(show_tpl)
+        self._tpl_preview.setVisible(show_tpl)
+        self._set_multi_tpl_visible(is_container)
         if show_tpl:
             self._populate_template_combo()
-            self._select_template_in_combo(step.get("template", ""))
+            if is_container:
+                templates = step.get("templates", [])
+                if not templates and step.get("template"):
+                    templates = [step["template"]]
+                self._load_template_list(templates)
+                self._select_template_in_combo("")
+                logic = step.get("match_logic", "or")
+                idx = self._match_logic_combo.findData(logic)
+                self._match_logic_combo.setCurrentIndex(idx if idx >= 0 else 0)
+            else:
+                self._select_template_in_combo(step.get("template", ""))
 
         self._step_desc.setText(step.get("description", ""))
-        self._prop_stack.setCurrentIndex({"check": 0, "click": 1, "delay": 2, "whileif": 3}.get(stype, 0))
+        self._step_desc.setReadOnly(stype == "ref")
+        self._prop_stack.setCurrentIndex(
+            {"check": 0, "click": 1, "delay": 2, "whileif": 3, "ref": 4}.get(stype, 0))
 
         if stype == "check":
             retry_on = step.get("retry_enabled", False)
@@ -1405,6 +1715,15 @@ class TaskConfigTab(QWidget):
             self._on_while_mode_changed()
         elif stype == "delay":
             self._delay_duration.setValue(step.get("duration_ms", 1000))
+        elif stype == "ref":
+            ref_name = step.get("ref_task", "")
+            self._ref_task_label.setText(ref_name or "(未设置)")
+            ref_task = self._task_mgr.get_task(ref_name) if ref_name else None
+            if ref_task:
+                n = count_steps_recursive(ref_task.get("steps", []))
+                self._ref_steps_label.setText(f"包含 {n} 个步骤")
+            else:
+                self._ref_steps_label.setText("任务不存在" if ref_name else "")
 
         self._updating = False
 
@@ -1439,15 +1758,16 @@ class TaskConfigTab(QWidget):
         stype = step.get("type", "")
         if stype == "delay":
             item.setText(1, self._fmt_ms(step.get("duration_ms", 1000)))
+        elif stype in ("check", "whileif"):
+            target = self._format_templates_label(step)
+            item.setText(1, target)
+            kw = "if" if stype == "check" else "while"
+            item.setText(0, f"{kw} ({target})")
         else:
             tpl_name = step.get("template", "")
             tpl_meta = self._tm.get_template(tpl_name) if self._tm and tpl_name else None
             target = tpl_meta.get("description", tpl_name) if tpl_meta else tpl_name
             item.setText(1, target)
-            if stype == "check":
-                item.setText(0, f"if ({target})")
-            elif stype == "whileif":
-                item.setText(0, f"while ({target})")
 
         item.setText(2, self._build_params_text(step, stype))
 
@@ -1459,7 +1779,11 @@ class TaskConfigTab(QWidget):
             return
         stype = step.get("type", "")
         step["description"] = self._step_desc.text().strip()
-        if stype in ("check", "click", "whileif"):
+        if stype in ("check", "whileif"):
+            step["templates"] = self._collect_template_list()
+            step["match_logic"] = self._match_logic_combo.currentData() or "or"
+            step["template"] = step["templates"][0] if step["templates"] else ""
+        elif stype == "click":
             step["template"] = self._template_combo.currentData() or ""
         if stype == "check":
             step["retry_enabled"] = self._retry_switch.isChecked()

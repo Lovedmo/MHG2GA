@@ -354,6 +354,38 @@ class DeviceManager:
         logger.info("扫描完成，共发现 %d 个设备", len(found))
         return found
 
+    def is_adb_device_online(self, address: str) -> bool:
+        """检查指定设备是否在 adb devices 中显示为 device（非 offline）。
+
+        对于 TCP 连接的设备（如模拟器），需要先 adb connect 让 ADB server 识别，
+        否则新启动的实例不会自动出现在 adb devices 列表中。
+        """
+        try:
+            conn_result = subprocess.run(
+                [self._adb_path, "connect", address],
+                capture_output=True, text=True, timeout=5,
+            )
+            conn_out = conn_result.stdout.strip()
+            logger.debug("adb connect %s → %s", address, conn_out,
+                         extra={"device": address})
+
+            result = subprocess.run(
+                [self._adb_path, "devices"],
+                capture_output=True, text=True, timeout=5,
+            )
+            for line in result.stdout.strip().splitlines()[1:]:
+                parts = line.strip().split()
+                if len(parts) >= 2 and parts[0] == address:
+                    status = parts[1]
+                    if status == "device":
+                        return True
+                    logger.debug("adb devices: %s 状态为 %s", address, status,
+                                 extra={"device": address})
+                    return False
+        except Exception as e:
+            logger.debug("ADB 检测异常: %s", e, extra={"device": address})
+        return False
+
     def connect(self, address: str, cap_method: str = "ADBCAP",
                 touch_method: str = "ADBTOUCH") -> DeviceInfo:
         """连接到指定设备。"""
@@ -942,7 +974,7 @@ class DeviceManager:
         except Exception:
             pass
 
-        logger.debug(
+        logger.info(
             "探活 %s: running=%s foreground=%s pid=%s",
             package_name, result["running"], result["foreground"], result["pid"],
             extra={"device": address},

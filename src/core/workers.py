@@ -270,8 +270,21 @@ class StartEmulatorAndConnectWorker(QThread):
                 self.error.emit(self._address, f"模拟器在 {self._max_wait}s 内未启动")
                 return
 
-            time.sleep(2)
-            self.stage.emit("模拟器已就绪，正在连接...")
+            adb_wait = 0
+            adb_max = 30
+            self.stage.emit("模拟器已启动，等待 ADB 就绪...")
+            while adb_wait < adb_max:
+                if self._dm.is_adb_device_online(self._address):
+                    break
+                time.sleep(2)
+                adb_wait += 2
+                self.stage.emit(f"等待 ADB 就绪... ({adb_wait}s/{adb_max}s)")
+
+            if not self._dm.is_adb_device_online(self._address):
+                self.error.emit(self._address, f"ADB 在 {adb_max}s 内未就绪")
+                return
+
+            self.stage.emit("ADB 已就绪，正在连接...")
             info = self._dm.connect(self._address, self._cap_method, self._touch_method)
             self.finished.emit(info.to_dict())
         except Exception as e:

@@ -169,3 +169,20 @@ class AppConfig:
         self._config["devices"] = [
             d for d in self.devices if d.get("address") != address
         ]
+
+    def get_task_settings(self, address: str, task_name: str) -> dict:
+        """获取指定设备上某个任务的设备级配置。"""
+        dev = self.get_device(address) or {}
+        all_ts = dev.get("task_settings", {})
+        return all_ts.get(task_name, {})
+
+    def set_task_settings(self, address: str, task_name: str, **kwargs) -> None:
+        """更新指定设备上某个任务的设备级配置。"""
+        for dev in self.devices:
+            if dev.get("address") == address:
+                ts = dev.setdefault("task_settings", {})
+                entry = ts.setdefault(task_name, {})
+                entry.update(kwargs)
+                return
+        entry = {"address": address, "task_settings": {task_name: kwargs}}
+        self.devices.append(entry)

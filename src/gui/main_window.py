@@ -42,7 +42,8 @@ class DeviceTabWidget(QTabWidget):
     config_changed = pyqtSignal(str)
 
     def __init__(self, device_info: dict, task_manager: TaskManager | None = None,
-                 template_manager: TemplateManager | None = None, parent=None):
+                 template_manager: TemplateManager | None = None,
+                 app_config=None, parent=None):
         super().__init__(parent)
         self.device_info = device_info
         self._address = device_info.get("address", "")
@@ -51,7 +52,8 @@ class DeviceTabWidget(QTabWidget):
         self.screenshot_tab = ScreenshotConfigTab()
         self.touch_tab = TouchConfigTab()
         self.task_tab = TaskConfigTab(task_manager=task_manager,
-                                      template_manager=template_manager)
+                                      template_manager=template_manager,
+                                      app_config=app_config)
 
         self.addTab(self.overview_tab, "设备概览")
         self.addTab(self.screenshot_tab, "截图与识别")
@@ -375,6 +377,12 @@ class MainWindow(QMainWindow):
 
     def _on_disconnect_device(self, address: str) -> None:
         """右键菜单 → 断开连接。"""
+        tab = self._device_tabs.get(address)
+        if tab:
+            tab.task_tab.stop_all_tasks()
+            ka_timer = getattr(tab, '_keepalive_timer', None)
+            if ka_timer:
+                ka_timer.stop()
         worker = DisconnectWorker(self._dm, address)
         worker.finished.connect(lambda addr: self._log("INFO", addr, "设备已断开"))
         self._workers.append(worker)
@@ -427,7 +435,18 @@ class MainWindow(QMainWindow):
         delay = dev_cfg.get("auto_launch_delay", 3)
         if locked_app and auto_launch:
             self._log("INFO", address, f"将在 {delay} 秒后自动启动: {locked_app}")
-            QTimer.singleShot(delay * 1000, lambda a=address, p=locked_app: self._do_start_app(a, p))
+            QTimer.singleShot(
+                delay * 1000,
+                lambda a=address, p=locked_app: self._do_start_app(a, p, trigger_auto_tasks=True))
+
+        if dev_cfg.get("keepalive_enabled", False) and locked_app:
+            tab = self._device_tabs.get(address)
+            if tab:
+                timer = getattr(tab, '_keepalive_timer', None)
+                if timer and not timer.isActive():
+                    interval = dev_cfg.get("keepalive_interval", 30)
+                    timer.start(interval * 1000)
+                    self._log("INFO", address, f"定时探活已恢复 (间隔 {interval}s)")
 
     # ---- 设备选择与配置 ----
 
@@ -440,6 +459,7 @@ class MainWindow(QMainWindow):
                 device_info,
                 task_manager=self._task_mgr,
                 template_manager=self._tm,
+                app_config=self._app_config,
             )
             tab_widget.task_tab.set_device_manager(self._dm)
             tab_widget.task_tab.set_active_device(address)
@@ -793,8 +813,9 @@ class MainWindow(QMainWindow):
         else:
             self._log("INFO", address, "已取消应用锁定")
 
-    def _do_start_app(self, address: str, package_name: str) -> None:
-        """启动指定应用。"""
+    def _do_start_app(self, address: str, package_name: str,
+                      trigger_auto_tasks: bool = False) -> None:
+        """启动指定应用。trigger_auto_tasks=True 时启动成功后执行 auto_start 任务。"""
         if not package_name:
             return
         if not self._dm.is_connected(address):
@@ -804,9 +825,17 @@ class MainWindow(QMainWindow):
         self._log("INFO", address, f"正在启动: {package_name}")
         worker = StartAppWorker(self._dm, address, package_name)
         worker.finished.connect(lambda pkg: self._log("INFO", address, f"应用已启动: {pkg}"))
+        if trigger_auto_tasks:
+            worker.finished.connect(lambda _pkg, a=address: self._trigger_auto_start_tasks(a))
         worker.error.connect(lambda e: self._log("ERROR", address, f"启动应用失败: {e}"))
         self._workers.append(worker)
         worker.start()
+
+    def _trigger_auto_start_tasks(self, address: str) -> None:
+        """应用启动成功后，触发该设备上标记了 auto_start 的任务。"""
+        tab = self._device_tabs.get(address)
+        if tab:
+            tab.task_tab.start_auto_start_tasks()
 
     # ---- 探活 ----
 
@@ -855,14 +884,14 @@ class MainWindow(QMainWindow):
             tab.overview_tab.set_alive_status(running, foreground)
 
         if foreground:
-            self._log("DEBUG", address, f"探活: {package} 前台运行中")
+            self._log("INFO", address, f"探活: {package} 前台运行中")
         elif running:
-            self._log("DEBUG", address, f"探活: {package} 后台运行中")
+            self._log("INFO", address, f"探活: {package} 后台运行中")
         else:
             self._log("WARNING", address, f"探活: {package} 未运行")
             if auto_restart:
                 self._log("INFO", address, f"自动拉起: {package}")
-                self._do_start_app(address, package)
+                self._do_start_app(address, package, trigger_auto_tasks=True)
 
     def _on_keepalive_toggled(self, address: str, enabled: bool) -> None:
         """开启/关闭定时探活。"""
@@ -957,6 +986,7 @@ class MainWindow(QMainWindow):
         self._device_panel.update_device_status(address, "disconnected")
         tab = self._device_tabs.get(address)
         if tab:
+            tab.task_tab.stop_all_tasks()
             timer = getattr(tab, '_preview_timer', None)
             if timer:
                 timer.stop()
