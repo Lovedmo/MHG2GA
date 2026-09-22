@@ -82,7 +82,7 @@ QPushButton {
     background-color: #313244;
     border: 1px solid #45475a;
     border-radius: 4px;
-    padding: 6px 16px;
+    padding: 6px 10px;
     color: #cdd6f4;
     min-height: 24px;
 }
@@ -151,8 +151,8 @@ QComboBox QAbstractItemView {
     selection-background-color: #45475a;
 }
 
-/* Spin Box & Double Spin Box */
-QSpinBox, QDoubleSpinBox {
+/* Spin Box / Double Spin Box / DateTime Edit */
+QSpinBox, QDoubleSpinBox, QDateTimeEdit {
     background-color: #313244;
     border: 1px solid #45475a;
     border-radius: 4px;
@@ -161,8 +161,17 @@ QSpinBox, QDoubleSpinBox {
     min-height: 24px;
 }
 
-QSpinBox:hover, QDoubleSpinBox:hover {
+QSpinBox:hover, QDoubleSpinBox:hover, QDateTimeEdit:hover {
     border-color: #89b4fa;
+}
+
+QDateTimeEdit:focus {
+    border-color: #89b4fa;
+}
+
+QDateTimeEdit::drop-down {
+    border: none;
+    width: 20px;
 }
 
 /* Line Edit */
@@ -177,6 +186,39 @@ QLineEdit {
 
 QLineEdit:focus {
     border-color: #89b4fa;
+}
+
+/* Calendar Popup */
+QCalendarWidget QWidget {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+}
+
+QCalendarWidget QToolButton {
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    color: #cdd6f4;
+    padding: 4px 8px;
+}
+
+QCalendarWidget QToolButton:hover {
+    border-color: #89b4fa;
+}
+
+QCalendarWidget QSpinBox {
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    color: #cdd6f4;
+}
+
+QCalendarWidget QAbstractItemView {
+    background-color: #1e1e2e;
+    border: 1px solid #45475a;
+    color: #cdd6f4;
+    selection-background-color: #89b4fa;
+    selection-color: #1e1e2e;
 }
 
 /* Slider */

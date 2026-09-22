@@ -1,18 +1,15 @@
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QDateTime
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QGroupBox, QLabel, QPushButton, QSpinBox, QCheckBox,
+    QGroupBox, QLabel, QPushButton, QSpinBox, QCheckBox, QDateTimeEdit,
     QListWidget, QListWidgetItem, QLineEdit, QAbstractItemView,
     QScrollArea, QFrame,
 )
 
-from src.gui.widgets.image_preview import ImagePreview
-
 
 class DeviceOverviewTab(QWidget):
-    """设备概览页：设备信息 + 实时截图预览 + 快捷操作。"""
+    """设备概览页：设备信息 + 快捷操作。"""
 
-    preview_requested = pyqtSignal()
     refresh_packages_requested = pyqtSignal(bool)
     lock_app_requested = pyqtSignal(str)
     launch_app_requested = pyqtSignal(str)
@@ -26,20 +23,25 @@ class DeviceOverviewTab(QWidget):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        layout = QHBoxLayout(self)
-        layout.setSpacing(12)
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setMinimumWidth(280)
-        scroll.setMaximumWidth(420)
 
         left_widget = QWidget()
         left = QVBoxLayout(left_widget)
         left.setSpacing(8)
-        left.setContentsMargins(0, 0, 4, 0)
+        left.setContentsMargins(0, 0, 0, 0)
+
+        content_grid = QGridLayout()
+        content_grid.setSpacing(8)
+        content_grid.setContentsMargins(0, 0, 0, 0)
+        content_grid.setColumnStretch(0, 1)
+        content_grid.setColumnStretch(1, 1)
 
         # ---- 设备信息 ----
         info_group = QGroupBox("设备信息")
@@ -71,7 +73,7 @@ class DeviceOverviewTab(QWidget):
             info_grid.addWidget(value_label, row, 1)
             self._info_labels[key] = value_label
 
-        left.addWidget(info_group)
+        content_grid.addWidget(info_group, 0, 0)
 
         # ---- 快捷操作 ----
         action_group = QGroupBox("快捷操作")
@@ -96,7 +98,7 @@ class DeviceOverviewTab(QWidget):
         self._save_screenshot_btn = QPushButton("保存截图")
         action_layout.addWidget(self._save_screenshot_btn, 2, 0, 1, 2)
 
-        left.addWidget(action_group)
+        content_grid.addWidget(action_group, 0, 1)
 
         # ---- 运行状态 ----
         status_group = QGroupBox("运行状态")
@@ -110,7 +112,7 @@ class DeviceOverviewTab(QWidget):
         self._duration_label = QLabel("--")
         status_layout.addWidget(QLabel("运行时长:"), 1, 0)
         status_layout.addWidget(self._duration_label, 1, 1)
-        left.addWidget(status_group)
+        content_grid.addWidget(status_group, 1, 0)
 
         # ---- 应用列表 ----
         app_group = QGroupBox("应用列表")
@@ -159,7 +161,7 @@ class DeviceOverviewTab(QWidget):
         app_btns.addWidget(self._unlock_btn)
         app_layout.addLayout(app_btns)
 
-        left.addWidget(app_group)
+        content_grid.addWidget(app_group, 2, 0, 1, 2)
 
         # ---- 应用守护 ----
         guard_group = QGroupBox("应用守护")
@@ -195,6 +197,21 @@ class DeviceOverviewTab(QWidget):
         auto_row.addWidget(self._auto_launch_delay)
         guard_layout.addLayout(auto_row)
 
+        disconnect_row = QHBoxLayout()
+        disconnect_row.setSpacing(4)
+        self._disconnect_schedule_cb = QCheckBox("定时断开")
+        self._disconnect_schedule_cb.setToolTip("到达指定时间后自动断开当前设备连接（单次）")
+        self._disconnect_schedule_cb.toggled.connect(self._on_disconnect_schedule_toggled)
+        disconnect_row.addWidget(self._disconnect_schedule_cb)
+        disconnect_row.addStretch()
+        disconnect_row.addWidget(QLabel("时间"))
+        self._disconnect_at_edit = QDateTimeEdit(QDateTime.currentDateTime().addSecs(300))
+        self._disconnect_at_edit.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+        self._disconnect_at_edit.setCalendarPopup(True)
+        self._disconnect_at_edit.setFixedWidth(175)
+        disconnect_row.addWidget(self._disconnect_at_edit)
+        guard_layout.addLayout(disconnect_row)
+
         keepalive_row = QHBoxLayout()
         keepalive_row.setSpacing(4)
         self._keepalive_cb = QCheckBox("定时探活")
@@ -215,7 +232,7 @@ class DeviceOverviewTab(QWidget):
         alive_row = QHBoxLayout()
         alive_row.setSpacing(4)
         self._check_alive_btn = QPushButton("立即探活")
-        self._check_alive_btn.setFixedWidth(75)
+        self._check_alive_btn.setMinimumWidth(86)
         self._check_alive_btn.clicked.connect(self.check_alive_requested.emit)
         alive_row.addWidget(self._check_alive_btn)
         self._alive_status = QLabel("--")
@@ -223,53 +240,13 @@ class DeviceOverviewTab(QWidget):
         alive_row.addWidget(self._alive_status, stretch=1)
         guard_layout.addLayout(alive_row)
 
-        left.addWidget(guard_group)
+        self._on_disconnect_schedule_toggled(False)
+        content_grid.addWidget(guard_group, 1, 1)
 
+        left.addLayout(content_grid)
         left.addStretch()
         scroll.setWidget(left_widget)
         layout.addWidget(scroll)
-
-        # ---- 右侧预览 ----
-        right = QVBoxLayout()
-        right.setSpacing(8)
-
-        preview_header = QHBoxLayout()
-        preview_header.addWidget(QLabel("实时预览"))
-        preview_header.addStretch()
-
-        self._refresh_once_btn = QPushButton("刷新")
-        self._refresh_once_btn.setFixedWidth(60)
-        self._refresh_once_btn.clicked.connect(self.preview_requested.emit)
-        preview_header.addWidget(self._refresh_once_btn)
-
-        self._auto_refresh_cb = QCheckBox("自动")
-        self._auto_refresh_cb.setChecked(False)
-        preview_header.addWidget(self._auto_refresh_cb)
-
-        preview_header.addWidget(QLabel("间隔:"))
-        self._refresh_interval = QSpinBox()
-        self._refresh_interval.setRange(1, 30)
-        self._refresh_interval.setValue(2)
-        self._refresh_interval.setSuffix(" 秒")
-        self._refresh_interval.setFixedWidth(80)
-        preview_header.addWidget(self._refresh_interval)
-        right.addLayout(preview_header)
-
-        self._preview = ImagePreview()
-        right.addWidget(self._preview, stretch=1)
-
-        coord_layout = QHBoxLayout()
-        self._coord_label = QLabel("坐标: --")
-        self._coord_label.setStyleSheet("color: #a6adc8; font-size: 11px;")
-        coord_layout.addWidget(self._coord_label)
-        coord_layout.addStretch()
-        right.addLayout(coord_layout)
-
-        self._preview.coordinate_clicked.connect(
-            lambda x, y: self._coord_label.setText(f"坐标: ({x}, {y})")
-        )
-
-        layout.addLayout(right, stretch=3)
 
     def set_device_info(self, info: dict) -> None:
         """更新设备信息展示。"""
@@ -277,13 +254,6 @@ class DeviceOverviewTab(QWidget):
         for key, label in self._info_labels.items():
             value = info.get(key, "--")
             label.setText(str(value) if value else "--")
-
-    def update_preview(self, image) -> None:
-        """更新实时预览截图。"""
-        self._preview.update_image(image)
-
-    def update_preview_from_file(self, filepath: str) -> None:
-        self._preview.update_from_file(filepath)
 
     def set_status(self, status: str, duration: str = "--") -> None:
         color_map = {"空闲": "#a6e3a1", "运行中": "#89b4fa", "暂停": "#f9e2af", "错误": "#f38ba8"}
@@ -341,6 +311,35 @@ class DeviceOverviewTab(QWidget):
         self._auto_launch_delay.setValue(delay)
         self._auto_launch_cb.blockSignals(False)
         self._auto_launch_delay.blockSignals(False)
+
+    def get_disconnect_schedule_config(self) -> dict:
+        """获取定时断开配置。"""
+        return {
+            "disconnect_schedule_enabled": self._disconnect_schedule_cb.isChecked(),
+            "disconnect_at": self._disconnect_at_edit.dateTime().toString("yyyy-MM-dd HH:mm:ss"),
+        }
+
+    def set_disconnect_schedule_config(self, enabled: bool, disconnect_at: str) -> None:
+        """设置定时断开配置（加载配置时调用）。"""
+        current_dt = self._disconnect_at_edit.dateTime()
+        if disconnect_at:
+            parsed = QDateTime.fromString(disconnect_at, "yyyy-MM-dd HH:mm:ss")
+            if parsed.isValid():
+                current_dt = parsed
+        elif enabled:
+            current_dt = QDateTime.currentDateTime().addSecs(300)
+
+        self._disconnect_schedule_cb.blockSignals(True)
+        self._disconnect_at_edit.blockSignals(True)
+        self._disconnect_schedule_cb.setChecked(enabled)
+        self._disconnect_at_edit.setDateTime(current_dt)
+        self._disconnect_schedule_cb.blockSignals(False)
+        self._disconnect_at_edit.blockSignals(False)
+        self._on_disconnect_schedule_toggled(enabled)
+
+    def _on_disconnect_schedule_toggled(self, enabled: bool) -> None:
+        # 时间始终可编辑，勾选仅表示是否启用定时断开。
+        self._disconnect_at_edit.setEnabled(True)
 
     # ---- 探活 ----
 

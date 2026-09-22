@@ -76,7 +76,7 @@ class LogConsole(QWidget):
         toolbar.addWidget(self._auto_scroll_cb)
 
         self._pin_btn = QPushButton("置顶")
-        self._pin_btn.setFixedWidth(60)
+        self._pin_btn.setMinimumWidth(90)
         self._pin_btn.setCheckable(True)
         self._pin_btn.setChecked(False)
         self._pin_btn.toggled.connect(self._on_pin_toggled)

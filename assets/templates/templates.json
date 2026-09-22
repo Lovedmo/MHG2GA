@@ -368,7 +368,7 @@
       "name": "confirm",
       "category": "common",
       "file": "battle/confirm.png",
-      "threshold": 0.9,
+      "threshold": 0.8,
       "rgb": false,
       "roi": [
         615,
@@ -424,7 +424,7 @@
       "category": "common",
       "file": "common/filltl_gm.png",
       "threshold": 0.9,
-      "rgb": true,
+      "rgb": false,
       "roi": [
         306,
         271,
@@ -533,6 +533,158 @@
       "description": "通关后再次挑战12用",
       "width": 92,
       "height": 25
+    },
+    {
+      "name": "get_double_tili",
+      "category": "common",
+      "file": "common/get_double_tili.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": [
+        264,
+        233,
+        508,
+        297
+      ],
+      "click_offset": [
+        -9,
+        197
+      ],
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "兑换双倍体力",
+      "width": 177,
+      "height": 36
+    },
+    {
+      "name": "no_get_double_tl",
+      "category": "common",
+      "file": "common/no_get_double_tl.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": [
+        263,
+        238,
+        498,
+        319
+      ],
+      "click_offset": [
+        188,
+        191
+      ],
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "兑换双倍体力（取消）",
+      "width": 174,
+      "height": 43
+    },
+    {
+      "name": "login_guanggao_libao",
+      "category": "common",
+      "file": "common/login_guanggao_libao.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "登录礼包广告",
+      "width": 226,
+      "height": 53
+    },
+    {
+      "name": "gameupdate",
+      "category": "common",
+      "file": "common/gameupdate.png",
+      "threshold": 0.8,
+      "rgb": false,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "版本更新",
+      "width": 379,
+      "height": 77
+    },
+    {
+      "name": "tili_qx",
+      "category": "common",
+      "file": "common/tili_qx.png",
+      "threshold": 0.8,
+      "rgb": true,
+      "roi": [
+        279,
+        259,
+        467,
+        254
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "买体力（取消）",
+      "width": 194,
+      "height": 59
+    },
+    {
+      "name": "tilimax",
+      "category": "common",
+      "file": "common/tilimax.png",
+      "threshold": 0.7,
+      "rgb": true,
+      "roi": [
+        649,
+        354,
+        187,
+        100
+      ],
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "体力max",
+      "width": 75,
+      "height": 43
+    },
+    {
+      "name": "queding",
+      "category": "common",
+      "file": "common/queding.png",
+      "threshold": 0.7,
+      "rgb": true,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "确定",
+      "width": 187,
+      "height": 70
+    },
+    {
+      "name": "queding2",
+      "category": "common",
+      "file": "common/queding2.png",
+      "threshold": 0.7,
+      "rgb": true,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "确定2",
+      "width": 184,
+      "height": 59
+    },
+    {
+      "name": "queding3",
+      "category": "common",
+      "file": "common/queding3.png",
+      "threshold": 0.7,
+      "rgb": true,
+      "roi": null,
+      "click_offset": null,
+      "mask_file": null,
+      "match_mode": "normal",
+      "description": "确定3",
+      "width": 197,
+      "height": 56
     }
   ]
 }

@@ -1,12 +1,11 @@
-from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal
-from PyQt6.QtGui import QAction, QIcon, QPixmap, QImage
+from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal, QDateTime
+from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QTabWidget, QToolBar, QStatusBar,
     QLabel, QApplication, QMessageBox, QStackedWidget,
     QSystemTrayIcon,
 )
-import numpy as np
 
 from src.config.settings import AppConfig
 from src.core.database import Database
@@ -103,6 +102,10 @@ class DeviceTabWidget(QTabWidget):
             config.get("auto_launch", False),
             config.get("auto_launch_delay", 3),
         )
+        self.overview_tab.set_disconnect_schedule_config(
+            config.get("disconnect_schedule_enabled", False),
+            config.get("disconnect_at", ""),
+        )
         self.overview_tab.set_keepalive_config(
             config.get("keepalive_enabled", False),
             config.get("keepalive_interval", 30),
@@ -112,6 +115,7 @@ class DeviceTabWidget(QTabWidget):
         ss_cfg = self.screenshot_tab.get_config()
         tt_cfg = self.touch_tab.get_config()
         al_cfg = self.overview_tab.get_auto_launch_config()
+        ds_cfg = self.overview_tab.get_disconnect_schedule_config()
         return {
             "cap_method": ss_cfg["cap_method"],
             "cap_interval": ss_cfg["cap_interval"],
@@ -120,6 +124,8 @@ class DeviceTabWidget(QTabWidget):
             "action_delay": tt_cfg["action_delay"],
             "auto_launch": al_cfg["auto_launch"],
             "auto_launch_delay": al_cfg["auto_launch_delay"],
+            "disconnect_schedule_enabled": ds_cfg["disconnect_schedule_enabled"],
+            "disconnect_at": ds_cfg["disconnect_at"],
             "keepalive_enabled": self.overview_tab._keepalive_cb.isChecked(),
             "keepalive_interval": self.overview_tab.get_keepalive_interval(),
         }
@@ -434,10 +440,21 @@ class MainWindow(QMainWindow):
         auto_launch = dev_cfg.get("auto_launch", False)
         delay = dev_cfg.get("auto_launch_delay", 3)
         if locked_app and auto_launch:
-            self._log("INFO", address, f"将在 {delay} 秒后自动启动: {locked_app}")
-            QTimer.singleShot(
-                delay * 1000,
-                lambda a=address, p=locked_app: self._do_start_app(a, p, trigger_auto_tasks=True))
+            try:
+                alive = self._dm.is_app_running(address, locked_app)
+                if alive.get("running", False):
+                    self._log("INFO", address, f"连接后检测到应用已运行，跳过自动启动: {locked_app}")
+                else:
+                    self._log("INFO", address, f"将在 {delay} 秒后自动启动: {locked_app}")
+                    QTimer.singleShot(
+                        delay * 1000,
+                        lambda a=address, p=locked_app: self._do_start_app(a, p, trigger_auto_tasks=True))
+            except Exception as e:
+                self._log("WARNING", address, f"检测应用运行状态失败，按原逻辑自动启动: {e}")
+                self._log("INFO", address, f"将在 {delay} 秒后自动启动: {locked_app}")
+                QTimer.singleShot(
+                    delay * 1000,
+                    lambda a=address, p=locked_app: self._do_start_app(a, p, trigger_auto_tasks=True))
 
         if dev_cfg.get("keepalive_enabled", False) and locked_app:
             tab = self._device_tabs.get(address)
@@ -488,7 +505,6 @@ class MainWindow(QMainWindow):
             ov._home_btn.clicked.connect(lambda _, a=address: self._do_key_action(a, "HOME"))
             ov._back_btn.clicked.connect(lambda _, a=address: self._do_key_action(a, "BACK"))
             ov._save_screenshot_btn.clicked.connect(lambda _, a=address: self._do_save_screenshot(a))
-            ov.preview_requested.connect(lambda a=address: self._do_preview_refresh(a))
             ov.refresh_packages_requested.connect(
                 lambda third_party, a=address: self._do_list_packages(a, third_party)
             )
@@ -496,29 +512,28 @@ class MainWindow(QMainWindow):
             ov.launch_app_requested.connect(lambda pkg, a=address: self._do_start_app(a, pkg))
             ov._auto_launch_cb.toggled.connect(lambda _: self._on_device_config_changed(address))
             ov._auto_launch_delay.valueChanged.connect(lambda _: self._on_device_config_changed(address))
+            ov._disconnect_schedule_cb.toggled.connect(
+                lambda enabled, a=address: self._on_disconnect_schedule_toggled(a, enabled)
+            )
+            ov._disconnect_at_edit.dateTimeChanged.connect(lambda _: self._on_device_config_changed(address))
             ov.check_alive_requested.connect(lambda a=address: self._do_check_alive(a))
             ov.keepalive_toggled.connect(lambda enabled, a=address: self._on_keepalive_toggled(a, enabled))
             ov._keepalive_interval.valueChanged.connect(lambda _: self._on_device_config_changed(address))
 
+            disconnect_timer = QTimer(self)
+            disconnect_timer.timeout.connect(lambda a=address: self._on_disconnect_schedule_tick(a))
+            tab_widget._disconnect_timer = disconnect_timer
+
             keepalive_timer = QTimer(self)
             keepalive_timer.timeout.connect(lambda a=address: self._do_keepalive_tick(a))
             tab_widget._keepalive_timer = keepalive_timer
-
-            preview_timer = QTimer(self)
-            preview_timer.timeout.connect(lambda a=address: self._on_preview_timer(a))
-            tab_widget._preview_timer = preview_timer
-            ov._auto_refresh_cb.toggled.connect(lambda checked, t=preview_timer, o=ov: (
-                t.start(o._refresh_interval.value() * 1000) if checked else t.stop()
-            ))
-            ov._refresh_interval.valueChanged.connect(lambda val, t=preview_timer, o=ov: (
-                t.setInterval(val * 1000) if o._auto_refresh_cb.isChecked() else None
-            ))
 
             self._device_tabs[address] = tab_widget
             self._content_stack.addWidget(tab_widget)
 
             device_config = self._app_config.get_device_config(address)
             tab_widget.load_config(device_config)
+            self._sync_disconnect_schedule_timer(address)
 
         self._content_stack.setCurrentWidget(self._device_tabs[address])
         self._log("DEBUG", "系统", f"切换到设备: {device_info.get('alias', address)}")
@@ -545,6 +560,7 @@ class MainWindow(QMainWindow):
 
         self._app_config.update_device_field(address, **new_cfg)
         self._save_config()
+        self._sync_disconnect_schedule_timer(address)
 
     # ---- 截图操作 ----
 
@@ -709,34 +725,6 @@ class MainWindow(QMainWindow):
         self._workers.append(worker)
         worker.start()
 
-    def _do_preview_refresh(self, address: str) -> None:
-        """手动/自动刷新设备概览的实时预览。"""
-        if not self._dm.is_connected(address):
-            return
-        temp_dir = get_data_path("data", "temp")
-        temp_path = str(temp_dir / f"preview_{address.replace(':', '_')}.png")
-        worker = ScreenshotWorker(self._dm, address, save_path=temp_path)
-        worker.finished.connect(lambda img, elapsed: self._on_preview_done(address, temp_path))
-        worker.error.connect(lambda e: logger.warning("预览刷新失败: %s", e, extra={"device": address}))
-        self._workers.append(worker)
-        worker.start()
-
-    def _on_preview_timer(self, address: str) -> None:
-        self._do_preview_refresh(address)
-
-    def _on_preview_done(self, address: str, filepath: str) -> None:
-        tab = self._device_tabs.get(address)
-        if not tab:
-            return
-        pixmap = QPixmap(filepath)
-        if not pixmap.isNull():
-            tab.overview_tab.update_preview(pixmap)
-            orientation = self._dm.get_orientation(address)
-            ori_names = {0: "竖屏", 1: "横屏(左)", 2: "倒置", 3: "横屏(右)"}
-            ori_text = ori_names.get(orientation, f"未知({orientation})")
-            if "orientation" in tab.overview_tab._info_labels:
-                tab.overview_tab._info_labels["orientation"].setText(ori_text)
-
     def _do_save_screenshot(self, address: str) -> None:
         """保存截图到文件。"""
         if not self._dm.is_connected(address):
@@ -890,8 +878,81 @@ class MainWindow(QMainWindow):
         else:
             self._log("WARNING", address, f"探活: {package} 未运行")
             if auto_restart:
+                # 避免应用闪退后旧任务线程尚未退出，又被 auto_start 触发新任务导致冲突。
+                if tab:
+                    self._log("WARNING", address, "探活自动拉起前，先停止当前任务执行器")
+                    tab.task_tab.stop_all_tasks()
                 self._log("INFO", address, f"自动拉起: {package}")
                 self._do_start_app(address, package, trigger_auto_tasks=True)
+
+    def _sync_disconnect_schedule_timer(self, address: str) -> None:
+        tab = self._device_tabs.get(address)
+        if not tab:
+            return
+        timer = getattr(tab, '_disconnect_timer', None)
+        if not timer:
+            return
+
+        schedule_cfg = tab.overview_tab.get_disconnect_schedule_config()
+        enabled = schedule_cfg.get("disconnect_schedule_enabled", False)
+        if enabled:
+            if not timer.isActive():
+                timer.start(1000)
+        elif timer.isActive():
+            timer.stop()
+
+    def _on_disconnect_schedule_toggled(self, address: str, enabled: bool) -> None:
+        tab = self._device_tabs.get(address)
+        if not tab:
+            return
+
+        if enabled:
+            now = QDateTime.currentDateTime()
+            disconnect_dt = tab.overview_tab._disconnect_at_edit.dateTime()
+            if disconnect_dt <= now:
+                # 勾选时如果旧时间已过期，先自动推到未来，避免立刻被清除导致无法编辑。
+                adjusted_dt = now.addSecs(300)
+                tab.overview_tab._disconnect_at_edit.blockSignals(True)
+                tab.overview_tab._disconnect_at_edit.setDateTime(adjusted_dt)
+                tab.overview_tab._disconnect_at_edit.blockSignals(False)
+                self._log(
+                    "WARNING",
+                    address,
+                    f"定时断开时间已过期，已自动调整为 {adjusted_dt.toString('yyyy-MM-dd HH:mm:ss')}",
+                )
+
+            self._on_device_config_changed(address)
+            schedule_at = tab.overview_tab.get_disconnect_schedule_config().get("disconnect_at", "--")
+            self._log("INFO", address, f"定时断开已开启，将在 {schedule_at} 自动断开")
+        else:
+            self._on_device_config_changed(address)
+            self._log("INFO", address, "定时断开已关闭")
+
+    def _on_disconnect_schedule_tick(self, address: str) -> None:
+        tab = self._device_tabs.get(address)
+        if not tab:
+            return
+        schedule_cfg = tab.overview_tab.get_disconnect_schedule_config()
+        if not schedule_cfg.get("disconnect_schedule_enabled", False):
+            return
+
+        disconnect_dt = tab.overview_tab._disconnect_at_edit.dateTime()
+        if QDateTime.currentDateTime() < disconnect_dt:
+            return
+
+        timer = getattr(tab, '_disconnect_timer', None)
+        if timer:
+            timer.stop()
+
+        schedule_at = disconnect_dt.toString("yyyy-MM-dd HH:mm:ss")
+        tab.overview_tab.set_disconnect_schedule_config(False, schedule_at)
+        self._on_device_config_changed(address)
+
+        if self._dm.is_connected(address):
+            self._log("INFO", address, f"到达定时断开时间 {schedule_at}，正在断开连接...")
+            self._on_disconnect_device(address)
+        else:
+            self._log("INFO", address, f"到达定时断开时间 {schedule_at}，设备当前未连接，已清除定时任务")
 
     def _on_keepalive_toggled(self, address: str, enabled: bool) -> None:
         """开启/关闭定时探活。"""
@@ -987,26 +1048,12 @@ class MainWindow(QMainWindow):
         tab = self._device_tabs.get(address)
         if tab:
             tab.task_tab.stop_all_tasks()
-            timer = getattr(tab, '_preview_timer', None)
-            if timer:
-                timer.stop()
             ka_timer = getattr(tab, '_keepalive_timer', None)
             if ka_timer:
                 ka_timer.stop()
         self._log("INFO", address, "连接已自动断开")
 
     # ---- 辅助方法 ----
-
-    @staticmethod
-    def _ndarray_to_pixmap(img: np.ndarray) -> QPixmap:
-        """安全地将 numpy 图像数组 (BGR) 转为 QPixmap。"""
-        import cv2
-        h, w = img.shape[:2]
-        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        rgb = np.ascontiguousarray(rgb)
-        bytes_per_line = 3 * w
-        qimg = QImage(bytes(rgb.data), w, h, bytes_per_line, QImage.Format.Format_RGB888)
-        return QPixmap.fromImage(qimg)
 
     def _connect_then(self, address: str, callback) -> None:
         """连接设备后执行回调。"""

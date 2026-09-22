@@ -150,6 +150,8 @@ class AppConfig:
             "locked_app": device.get("locked_app", ""),
             "auto_launch": device.get("auto_launch", False),
             "auto_launch_delay": device.get("auto_launch_delay", 3),
+            "disconnect_schedule_enabled": device.get("disconnect_schedule_enabled", False),
+            "disconnect_at": device.get("disconnect_at", ""),
             "keepalive_enabled": device.get("keepalive_enabled", False),
             "keepalive_interval": device.get("keepalive_interval", 30),
             "tasks": device.get("tasks", []),
